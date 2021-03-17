@@ -22,23 +22,26 @@ class PenclCliLauncher extends PenclPlugin {
 
   constructor() {
     super();
-    this._yargs = null;
-    this._hooks = null;
+    this.yargs = null;
+    this.hooks = null;
   }
 
   /**
    * @param {cliHook[]} hooks
    */
   setHooks(hooks) {
-    this._hooks = hooks;
+    this.hooks = hooks;
   }
 
   async execute() {
-    this._yargs = Yargs(hideBin(process.argv));
-    for (const hook of this._hooks) {
-      await hook(this);
+    this.yargs = Yargs(hideBin(process.argv));
+    for (let hook of this.hooks) {
+      if (!Array.isArray(hook)) hook = [hook];
+      for (const item of hook) {
+        this.command(item.command, item.description, item.builder, item.execute);
+      }
     }
-    this._yargs.argv;
+    await this.yargs.argv;
   }
 
   /**
@@ -49,7 +52,10 @@ class PenclCliLauncher extends PenclPlugin {
    * @returns {Yargs}
    */
   command(command, description, definition, execute) {
-    return this._yargs.command(command, description, definition, execute);
+    return this.yargs.command(command, description, definition, async (argv) => {
+      this.argv = argv;
+      await execute(this);
+    });
   }
 
 }
