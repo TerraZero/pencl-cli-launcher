@@ -8,16 +8,6 @@ const PenclPlugin = require('pencl-base/src/Boot/PenclPlugin');
  * @param {PenclCliLauncher} launcher
  */
 
-/**
- * @callback yargsDefinitionCallback
- * @param {Yargs} yargs
- */
-
-/**
- * @callback yargsExecuteCallback
- * @param {Yargs} argv
- */
-
 class PenclCliLauncher extends PenclPlugin {
 
   get name() {
@@ -54,8 +44,8 @@ class PenclCliLauncher extends PenclPlugin {
   /**
    * @param {string} command 
    * @param {string} description 
-   * @param {yargsDefinitionCallback} definition 
-   * @param {yargsExecuteCallback} execute 
+   * @param {Function} definition 
+   * @param {Function} execute
    * @returns {Yargs}
    */
   command(command, description, definition, execute) {
