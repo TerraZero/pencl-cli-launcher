@@ -2,7 +2,7 @@ const Yargs = require('yargs/yargs');
 const { hideBin } = require('yargs/helpers');
 
 const PenclPlugin = require('pencl-base/src/Boot/PenclPlugin');
-const Form = require('./src/Form');
+const CLIForm = require('./src/CLIForm');
 
 /**
  * @callback cliHook
@@ -28,7 +28,7 @@ class PenclCliLauncher extends PenclPlugin {
   }
 
   getForm() {
-    return new Form();
+    return new CLIForm();
   }
 
   /**

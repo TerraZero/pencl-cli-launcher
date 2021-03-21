@@ -11,6 +11,10 @@
   "dependencies": {
     "colors": "^1.4.0",
     "inquirer": "^8.0.0",
+    "inquirer-autocomplete-prompt": "^1.3.0",
+    "inquirer-table-prompt": "^0.2.1",
+    "pencl-base": "git+https://github.com/TerraZero/pencl-base.git",
+    "pencl-cli-launcher": ".",
     "yargs": "^16.2.0"
   }
 }
