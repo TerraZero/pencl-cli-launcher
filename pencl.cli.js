@@ -1,49 +1,66 @@
-module.exports = {
+module.exports = [
+  {
+    command: 'generate:config <plugin...>',
+    description: 'Add a config file for the plugin or add to existing config file.',
 
-  command: 'serve [port]',
-  description: 'Test',
+    /**
+     * @param {import('yargs')} yargs
+     */
+    builder: (yargs) => {
+      return yargs
+        .positional('plugin', {
+          type: 'array',
+          description: 'The pencl-plugin',
+        })
+        .option('path', {
+          type: 'string',
+          description: 'The path where the pencl.json is located.',
+          default: '.',
+        });
+    },
 
-  /**
-   * @param {import('yargs')} yargs 
-   * @returns 
-   */
-  builder: (yargs) => {
-    return yargs.positional('port', {
-      describe: 'port to bind on',
-      default: 5000,
-    });
-  },
+    /**
+     * @param {import('./index')} cli 
+     */
+    execute: async (cli) => {
+      const Boot = require('pencl-base');
+      const Path = require('path');
+      const FS = require('fs');
 
-  /**
-   * @param {import('pencl-cli-launcher')} cli 
-   */
-  execute: async (cli) => {
-    const form = cli.getForm();
+      let plugin = null;
+      try {
+        plugin = require(cli.argv.plugin);
+      } catch (e) {
+        console.log(e);
+      }
+      const form = cli.getForm();
+      plugin.getConfigForm(form);
+      await form.execute();
 
-    const options = ['hallo', 'huhn', 'cool', 'cookcook'];
-    form.select('test', 'Test:', options);
-    form.input('cwd', 'CWD:');
-    form.table('plan', 'Plan:', [
-      {
-        name: "Arms",
-        value: "arms"
-      },
-      {
-        name: "Legs",
-        value: "legs"
-      },
-    ], [
-      {
-        name: "Monday",
-        value: 0
-      },
-      {
-        name: "Tuesday",
-        value: 1
-      },
-    ]);
-    await form.execute();
-    console.log(form.values);
-  },
+      console.log(form.values);
+      let file = null;
+      let data = {};
+      if (Boot.file) {
+        console.log('Boot', Boot.file);
+        file = Boot.file;
+      } else {
 
-}
+        if (Path.isAbsolute(cli.argv.path)) {
+          console.log('abs', cli.argv.path);
+          file = Path.join(cli.argv.path, 'pencl.json');
+        } else {
+          console.log('rel', process.cwd(), cli.argv.path);
+          file = Path.join(process.cwd(), cli.argv.path, 'pencl.json');
+        }
+      }
+      console.log('file', file);
+      if (FS.existsSync(file)) {
+        console.log('exist', data);
+        data = require(file);
+      }
+      console.log(plugin.name, form.values);
+      data[plugin.name] = form.values;
+      FS.writeFileSync(file, JSON.stringify(data, null, '  '));
+    },
+  }
+];

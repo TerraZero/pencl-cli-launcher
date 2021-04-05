@@ -1,27 +1,17 @@
 const Inquirer = require('inquirer');
-const FieldBuilder = require('./FieldBuilder');
-/**
- * @callback fieldBuilderCallback
- * @param {FieldBuilder} field
- */
-
-/**
- * @callback autocompleteCallback
- * @param {object} answersSoFar
- * @param {string} input
- * @returns {string[]}
- */
+const CLIFieldBuilder = require('./CLIFieldBuilder');
+const Handler = require('pencl-base/src/Util/Handler');
+const Reflection = require('pencl-base/src/Util/Reflection');
 
 module.exports = class CLIForm {
 
-  constructor() {
-    this.fields = [];
-    this.values = null;
-    this.bottom = null;
-    this._loaded_plugins = [];
-  }
-
-  checkPlugin(type, plugin) {
+  /**
+   * @param {string} type 
+   * @param {string} plugin 
+   * @returns {boolean}
+   */
+  static checkPlugin(type, plugin) {
+    this._loaded_plugins = this._loaded_plugins || [];
     if (this._loaded_plugins.includes(plugin)) return true;
     let nodePlugin = null;
     try {
@@ -31,97 +21,167 @@ module.exports = class CLIForm {
       return false;
     }
     Inquirer.registerPrompt(type, nodePlugin);
+    this._loaded_plugins.push(plugin);
     return true;
   }
 
-  checkFieldBuilder(value, definition, builder) {
-    if (typeof value === 'function') {
-      this.field(value, definition);
-    } else if (typeof builder === 'function') {
-      this.field(builder, definition);
-    } else {
-      this.fields.push(definition);
+  constructor() {
+    this.fields = [];
+    this.values = null;
+    this.bottom = null;
+    this._error = null;
+    this._loaded_plugins = [];
+
+    this.handler = new Handler();
+  }
+
+  get error() {
+    return this._error;
+  }
+
+  set error(error) {
+    this._error = error;
+    this.handler.emit('error', this, error);
+  }
+
+  /**
+   * @param {string} name 
+   * @returns {CLIFieldBuilder}
+   */
+  getField(name) {
+    for (const field of this.fields) {
+      if (field.definition.name === name) return field;
     }
+    return null;
+  }
+
+  /**
+   * @param {string} field 
+   * @returns {any}
+   */
+  getValue(field) {
+    return Reflection.getDeep(this.values, field);
+  }
+
+  /**
+   * @param {string} field 
+   * @param {any} value 
+   * @returns {this}
+   */
+  setValue(field, value) {
+    Reflection.setDeep(this.values, field, value);
     return this;
   }
 
   /**
-   * @param {fieldBuilderCallback} callback 
+   * @param {string} type
+   * @param {string} name
    * @param {object} definition
-   * @returns {this}
+   * @returns {CLIFieldBuilder}
    */
-  field(callback, definition = {}) {
-    const field = new FieldBuilder(this, definition);
-    callback(field);
-    this.fields.push(field.definition);
-    return this;
+  field(type, name, definition = {}) {
+    definition.type = type;
+    definition.name = name;
+    const field = new CLIFieldBuilder(this, definition);
+    this.fields.push(field);
+    return field;
   }
 
   /**
-   * @param {(string|fieldBuilderCallback)} name 
+   * @param {string} name 
    * @param {string} message 
-   * @param {fieldBuilderCallback} builder 
-   * @returns {this}
+   * @returns {CLIFieldBuilder}
    */
-  input(name, message, builder) {
-    return this.checkFieldBuilder(name, {
-      type: 'input',
-      name,
-      message,
-    }, builder);
+  input(name, message) {
+    return this.field('input', name, {
+      message: message + ': ',
+    });
   }
 
   /**
-   * @param {(string|fieldBuilderCallback)} name 
+   * @param {string} name 
    * @param {string} message 
-   * @param {autocompleteCallback} source 
-   * @param {fieldBuilderCallback} builder
-   * @returns 
+   * @param {import('./CLIFieldBuilder').choiceItem[]} choices
+   * @returns {CLIFieldBuilder}
    */
-  autocomplete(name, message, source, builder = null) {
-    if (this.checkPlugin('autocomplete', 'inquirer-autocomplete-prompt')) {
-      this.checkFieldBuilder(name, {
-        type: 'autocomplete',
-        name,
-        message,
+  select(name, message, choices = null) {
+    return this.field('list', name, {
+      message: message + ': ',
+      choices,
+    });
+  }
+
+  /**
+   * @param {string} name 
+   * @param {string} message 
+   * @param {import('./CLIFieldBuilder').autocompleteCallback} source 
+   * @returns {CLIFieldBuilder}
+   */
+  autocomplete(name, message, source) {
+    if (CLIForm.checkPlugin('autocomplete', 'inquirer-autocomplete-prompt')) {
+      return this.field('autocomplete', name, {
+        message: message + ': ',
         source,
-      }, builder);
+      });
     }
-    return this;
+    return null;
   }
 
   /**
    * @param {(string|fieldBuilderCallback)} name 
    * @param {string} message 
    * @param {string[]} options
-   * @param {fieldBuilderCallback} builder
-   * @returns 
+   * @returns {CLIFieldBuilder}
    */
-  select(name, message, options = [], builder = null) {
+  autoSelect(name, message, options = []) {
     return this.autocomplete(name, message, (answers, input) => {
       return options.filter((v) => v.startsWith(input));
-    }, builder);
+    });
   }
 
   /**
-   * @param {(string|fieldBuilderCallback)} name 
+   * @param {string} name 
    * @param {string} message 
-   * @param {object[]} columns 
-   * @param {object[]} rows 
-   * @param {fieldBuilderCallback} builder 
+   * @param {import('./CLIFieldBuilder').choiceItem[]} columns 
+   * @param {import('./CLIFieldBuilder').choiceItem[]} rows 
    * @returns 
    */
-  table(name, message, columns, rows, builder = null) {
-    if (this.checkPlugin('table', 'inquirer-table-prompt')) {
-      this.checkFieldBuilder(name, {
-        type: 'table',
-        name,
-        message,
+  table(name, message, columns, rows) {
+    if (CLIForm.checkPlugin('table', 'inquirer-table-prompt')) {
+      return this.field('table', name, {
+        message: message + ': ',
         columns,
         rows,
-      }, builder);
+      });
     }
-    return this;
+    return null;
+  }
+
+  /**
+   * @param {string} name 
+   * @param {string} message 
+   */
+  bool(name, message) {
+    return this.field('input', name, {
+      message: message + ' (y/n): ',
+      validate: (input, bag) => {
+        if (input === '') return 'Please use "y" for TRUE or "n" for FALSE.';
+        return true;
+      },
+      filter: (input, bag) => {
+        switch (input.toLowerCase()) {
+          case 'y': 
+          case 'yes':
+          case 'true': 
+            return true;
+          case 'n': 
+          case 'no':
+          case 'false':
+            return false;
+        }
+        return '';
+      },
+    });
   }
 
   setStatus(message) {
@@ -134,7 +194,13 @@ module.exports = class CLIForm {
 
   async execute() {
     try {
-      this.values = await Inquirer.prompt(this.fields);
+      await this.handler.emit('execute:prompts', this);
+      const prompts = this.fields.map((field) => {
+        return field.execute();
+      });
+      await this.handler.emit('execute:before', this, prompts);
+      this.values = await Inquirer.prompt(prompts);
+      await this.handler.emit('execute:after', this);
     } catch (e) {
       this.error = e;
     }

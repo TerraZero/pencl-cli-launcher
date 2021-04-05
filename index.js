@@ -40,10 +40,11 @@ class PenclCliLauncher extends PenclPlugin {
 
   async execute() {
     this.yargs = Yargs(hideBin(process.argv));
+    this.yargs.scriptName('pencl');
     for (let hook of this.hooks) {
       if (!Array.isArray(hook)) hook = [hook];
       for (const item of hook) {
-        this.command(item.command, item.description, item.builder, item.execute);
+        this.command(item.command, item.description, item.builder || (yargs => yargs), item.execute);
       }
     }
     await this.yargs.argv;
